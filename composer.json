@@ -1,5 +1,5 @@
 {
-    "name": "handelaar/europarl2publicwhip",
+    "name": "handelaar/europarl2pw",
     "type": "library",
     "description": "Convert European Parliament plenary transcripts into publicwhip XML",
     "version": "0.0.1",
