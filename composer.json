@@ -1,0 +1,19 @@
+{
+    "name": "handelaar/europarl2publicwhip",
+    "type": "library",
+    "description": "Convert European Parliament plenary transcripts into publicwhip XML",
+    "version": "0.0.1",
+    "keywords": ["european parliament","europarl","publicwhip","parliament","oireachtas","hansard","kildarestreet","theyworkforyou","openaustralia"],
+    "authors": [
+        {
+            "name": "John Handelaar",
+            "email": "john@handelaar.org",
+            "homepage": "https://www.kildarestreet.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=7.0",
+        "ext-xml": "*"
+    }
+}
