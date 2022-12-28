@@ -3,17 +3,16 @@
 
 /**
  * europarl - Convert European Parliament plenary XML to PublicWhip XML
- * 
+ *
  * WARNING: HIGHLY-EXPERIMENTAL ALPHA-AS-FUCK TEST CODE
  * WARNING: NOT FOR USE
- * 
+ *
  * @version  0.0.1
  * @license  https://opensource.org/licenses/GPL-2.0 GPL 2
  * @author   John Handelaar <john@handelaar.org>
- */ 
+ */
 
-
- // Test script; to be removed before release
+// Test script; to be removed before release
 $akomantoso = new ConvertEuroparlToPublicwhip('data/CRE-9-2022-11-24_EN.xml');
 $akomantoso->setChamber('europarl');
 $akomantoso->setSpeakers(array('eID' => 'publicwhip_id'));
@@ -21,35 +20,32 @@ $akomantoso->toPublicWhip();
 $akomantoso->write('data/EUP20221124a.xml');
 die();
 
-class ConvertEuroparlToPublicwhip {
+class ConvertEuroparlToPublicwhip
+{
 
-    public function __construct($filename) {
-        
+    public function __construct($filename)
+    {
+
         # TODO: Make this actually do something later
-        $this->debug = FALSE;
-        
-        # Load example file 
+        $this->debug = false;
+
+        # Load example file
         # TODO: replace this with specified config options
         $this->europarl = simplexml_load_file($filename);
 
-
         # Filename assumed to contain date in format YYYYmmdd; this regex just removes non-numeric chars from filename
-        # TODO: move this to config 
-        $this->date = DateTime::createFromFormat('Ymd H:i:s', preg_replace("/[^0-9]/", "", str_replace("CRE-9-","",$filename)) . " 09:00:00");
-        
+        # TODO: move this to config
+        $this->date = DateTime::createFromFormat('Ymd H:i:s', preg_replace("/[^0-9]/", "", str_replace("CRE-9-", "", $filename)) . " 09:00:00");
 
         # TODO: move these to config
         $this->namespace = 'com.kildarestreet.eu'; # use eg 'uk.org.publicwhip' if you're not in Ireland
         $this->revision = 'a';
 
-
         # Start item counter
         $this->counter = 0;
 
-
         # Used later to tag answers to questions
         $this->currentlang = "en";
-
 
         # Create bucket for PublicWhip XML output
         $this->output = array();
@@ -57,47 +53,46 @@ class ConvertEuroparlToPublicwhip {
         #echo "\nEuroparl transcript file:\n" . $filename . "\n\n";
     }
 
+    public function toPublicWhip()
+    {
 
-    public function toPublicWhip() {
-        
         // Loop through each CHAPTER section in source XML's simplexml object
 
-        foreach($this->europarl->xpath('//HTML/DEBATS/CHAPTER') as $section) {
+        foreach ($this->europarl->xpath('//HTML/DEBATS/CHAPTER') as $section) {
 
             // Generate publicwhip <majorheading>
-            $chapnum  = intval(strval($section->attributes()->NUMBER));
-            
-            if($chapnum > 0) {
-                $this->counter ++;
+            $chapnum = intval(strval($section->attributes()->NUMBER));
+
+            if ($chapnum > 0) {
+                $this->counter++;
                 $domnode = dom_import_simplexml($section);
-                echo "Line " . str_pad($domnode->getLineNo(), 4, '0', STR_PAD_LEFT)  . ": (" . $this->currentlang . ") (" . $this->date->format("H:i:s")  . ")   ";
+                echo "Line " . str_pad($domnode->getLineNo(), 4, '0', STR_PAD_LEFT) . ": (" . $this->currentlang . ") (" . $this->date->format("H:i:s") . ")   ";
                 echo $section->attributes()->NUMBER;
                 echo ": ";
-            
+
                 // Find English chapter title, discard the rest
-                
+
                 $local = new SimpleXmlElement($section->asXml());
                 $localxml = $local->xpath('//TL-CHAP[@VL="EN"]');
                 # Chapter titles may contain links and those have gigantic spaces within them.
                 # Flatten text and remove huge random empty strings
                 $flattenme = dom_import_simplexml($localxml[0]);
                 # remove this substr when not merely console testing
-                echo substr(trim(str_replace("               ","",$flattenme->nodeValue)),0,170) . "\n";
-                
-                // Make heading.  If chapter number has a decimal, drop heading to minor
-                $headingtype = stristr($section->attributes()->NUMBER,".") ? "minor" : "major";
-                $this->output[] .= $this->heading($headingtype,$flattenme->nodeValue);
+                echo substr(trim(str_replace("               ", "", $flattenme->nodeValue)), 0, 170) . "\n";
 
-                unset($flattenme,$domnode, $local, $localxml,$headingtype);
+                // Make heading.  If chapter number has a decimal, drop heading to minor
+                $headingtype = stristr($section->attributes()->NUMBER, ".") ? "minor" : "major";
+                $this->output[] .= $this->heading($headingtype, $flattenme->nodeValue);
+
+                unset($flattenme, $domnode, $local, $localxml, $headingtype);
             }
-        
 
             foreach ($section->children() as $child) {
 
-                switch($child->getName()){
+                switch ($child->getName()) {
 
                     case "TL-CHAP":
-                        if(isset($child->attributes()->{'VOD-START'})) {
+                        if (isset($child->attributes()->{'VOD-START'})) {
                             $this->date = DateTime::createFromFormat('Y-m-d\TH:i:s.v', (string) $child->attributes()->{'VOD-START'}, new DateTimeZone('Europe/Brussels'));
                         }
                         break;
@@ -133,34 +128,35 @@ class ConvertEuroparlToPublicwhip {
         }
     }
 
-    private function numero($object) {
-        
+    private function numero($object)
+    {
+
         # Set current language if new one
-        if(isset($object->attributes()->VL)) {
-        
+        if (isset($object->attributes()->VL)) {
+
             $this->currentlang = strtolower($object->attributes()->VL);
-        
+
         }
 
         # Update global timestamp
-        if(isset($object->attributes()->{'VOD-START'})) {
-        
+        if (isset($object->attributes()->{'VOD-START'})) {
+
             $this->date = DateTime::createFromFormat('Y-m-d\TH:i:s.v', (string) $object->attributes()->{'VOD-START'}, new DateTimeZone('Europe/Brussels'));
-            
+
         }
 
         $this->consolewrite($object);
-        
+
         return;
 
     }
 
-
-    private function cleanup($string) {
+    private function cleanup($string)
+    {
 
         /*
 
-        */
+         */
 
         $in = array(
             "<PRES>",
@@ -193,33 +189,33 @@ class ConvertEuroparlToPublicwhip {
         );
 
         $string = str_replace($in, $out, $string);
-        $string = preg_replace('/\s+/', ' ', $string);  # remove weird 15+ repeated space characters
-        
+        $string = preg_replace('/\s+/', ' ', $string); # remove weird 15+ repeated space characters
+
         return trim($string);
 
     }
 
-
-    private function consolewrite($object){
+    private function consolewrite($object)
+    {
         $domnode = dom_import_simplexml($object);
-        echo "Line " . str_pad($domnode->getLineNo(), 4, '0', STR_PAD_LEFT)  . ": (" . $this->currentlang . ") (" . $this->date->format("H:i:s")  . ")   ";
+        echo "Line " . str_pad($domnode->getLineNo(), 4, '0', STR_PAD_LEFT) . ": (" . $this->currentlang . ") (" . $this->date->format("H:i:s") . ")   ";
         echo "          ";
-        echo strtolower ($object->getname());
+        echo strtolower($object->getname());
         echo "\n";
 
         return;
     }
 
+    private function speechProcedural($string)
+    {
 
-    private function speechProcedural($string) {
-
-        $speech =  '        <speech lang="' . $this->currentlang .
-            '" id="' . $this->namespace . '/' . $this->chamber . '/' . $this->date->format('Y-m-d') . $this->revision . '.' . 
-            $this->counter . '" ' . 'nospeaker="true" ';
+        $speech = '        <speech lang="' . $this->currentlang .
+        '" id="' . $this->namespace . '/' . $this->chamber . '/' . $this->date->format('Y-m-d') . $this->revision . '.' .
+        $this->counter . '" ' . 'nospeaker="true" ';
 
         # Don't add timestamp if we haven't yet encountered an object with a timestamp
-        if($this->date->format('H:i:s') !== "00:00:00") {
-            $speech .= 'time="' . $this->date->format('H:i:s') . '" '; 
+        if ($this->date->format('H:i:s') !== "00:00:00") {
+            $speech .= 'time="' . $this->date->format('H:i:s') . '" ';
         }
 
         $speech .= 'url="' . '">' . $this->cleanup(trim($string)) . "</speech>";
@@ -227,31 +223,30 @@ class ConvertEuroparlToPublicwhip {
 
     }
 
-
-    private function speech($object) {
+    private function speech($object)
+    {
 
         /*
 
         <INTERVENTION>
-            <ORATEUR PP="NULL" LG="DE" MEPID="96998" CODICT="96998" LIB="Evelyn | Regner">
-                <LG>DE</LG>
-                <EMPHAS NAME="B">Die Präsidentin. – </EMPHAS>
-            </ORATEUR>
-            <PARA>Als nächster Punkt der Tagesordnung folgt die Aussprache über den Bericht von Martina Dlabajová im Namen des Ausschusses für Industrie, Forschung und Energie über den Vorschlag für einen Beschluss des Europäischen Parlaments und des Rates über das Politikprogramm für 2030 „Weg in die digitale Dekade“ (<a href="#reds:iEcCom/COM-2021-0574" data-rel="reds" redmap-uri="/reds:iEcCom/COM-2021-0574">COM(2021)0574</a> – C9-0359/2021 – <a href="#reds:DirContProc/COD-2021-0293" data-rel="reds" redmap-uri="/reds:DirContProc/COD-2021-0293">2021/0293(COD)</a>) (                    <a href="#reds:iPlRp/A-9-2022-0159" data-rel="reds" redmap-uri="/reds:iPlRp/A-9-2022-0159">A9-0159/2022</a>).
-            </PARA>
+        <ORATEUR PP="NULL" LG="DE" MEPID="96998" CODICT="96998" LIB="Evelyn | Regner">
+        <LG>DE</LG>
+        <EMPHAS NAME="B">Die Präsidentin. – </EMPHAS>
+        </ORATEUR>
+        <PARA>Als nächster Punkt der Tagesordnung folgt die Aussprache über den Bericht von Martina Dlabajová im Namen des Ausschusses für Industrie, Forschung und Energie über den Vorschlag für einen Beschluss des Europäischen Parlaments und des Rates über das Politikprogramm für 2030 „Weg in die digitale Dekade“ (<a href="#reds:iEcCom/COM-2021-0574" data-rel="reds" redmap-uri="/reds:iEcCom/COM-2021-0574">COM(2021)0574</a> – C9-0359/2021 – <a href="#reds:DirContProc/COD-2021-0293" data-rel="reds" redmap-uri="/reds:DirContProc/COD-2021-0293">2021/0293(COD)</a>) (                    <a href="#reds:iPlRp/A-9-2022-0159" data-rel="reds" redmap-uri="/reds:iPlRp/A-9-2022-0159">A9-0159/2022</a>).
+        </PARA>
         </INTERVENTION>
 
-
-        */
+         */
         $speechcontent = "";
 
-        foreach($object->children() as $child) {
+        foreach ($object->children() as $child) {
 
-            switch($child->getName()){
+            switch ($child->getName()) {
                 case "ORATEUR":
-                    
+
                     $speakerid = $child->attributes()->CODICT;
-                    $speakername = str_replace(" | "," ",$child->attributes()->LIB);
+                    $speakername = str_replace(" | ", " ", $child->attributes()->LIB);
                     $this->currentlang = strtolower($child->attributes()->LG);
                     break;
                 case "PARA":
@@ -260,71 +255,72 @@ class ConvertEuroparlToPublicwhip {
                 default:
                     die("function speech() doesn't know anything about " . $child->getName() . "\n");
             }
-            
+
         }
-        
+
         $speech = '        <speech lang="' . $this->currentlang .
-            '" id="' . $this->namespace . '/' . $this->chamber . '/' . $this->date->format('Y-m-d') . $this->revision . '.' . 
-            $this->counter  . '" ' . 'speakerid="eu.europarl/person/' . $speakerid . '" ' .
-            'speakername="' .  trim($speakername)  .  '" ' ;  
+        '" id="' . $this->namespace . '/' . $this->chamber . '/' . $this->date->format('Y-m-d') . $this->revision . '.' .
+        $this->counter . '" ' . 'speakerid="eu.europarl/person/' . $speakerid . '" ' .
+        'speakername="' . trim($speakername) . '" ';
 
         # Don't add timestamp if we haven't yet encountered an object with a timestamp
-        if($this->date->format('H:i:s') !== "00:00:00") {
-            $speech .= 'time="' . $this->date->format('H:i:s') . '" '; 
+        if ($this->date->format('H:i:s') !== "00:00:00") {
+            $speech .= 'time="' . $this->date->format('H:i:s') . '" ';
         }
         $speech .= 'url="' . '">';
-        
-        $speech .= $speechcontent;            
-        
+
+        $speech .= $speechcontent;
+
         $speech .= "</speech>";
         #echo $speech;
         return $speech;
 
     }
 
+    private function heading($type, $object)
+    {
 
-    private function heading($type,$object) {
-
-        $date = date_format($this->date,'Y-m-d');
-        $time = date_format($this->date,'H:i:s');
+        $date = date_format($this->date, 'Y-m-d');
+        $time = date_format($this->date, 'H:i:s');
 
         $output = "    <$type-heading " .
-            'id="' . $this->namespace . '/' . $this->chamber . '/' . $date . $this->revision . '.' . $this->counter . '" ' .
-            'nospeaker="true" lang="en" ' .
-            'time="' . $time . '" ' .
-            'url="' . '">' .
-            $this->cleanup(trim($object)) .
+        'id="' . $this->namespace . '/' . $this->chamber . '/' . $date . $this->revision . '.' . $this->counter . '" ' .
+        'nospeaker="true" lang="en" ' .
+        'time="' . $time . '" ' .
+        'url="' . '">' .
+        $this->cleanup(trim($object)) .
             "</$type-heading>";
         #echo $output ."\n";
-        return($output);
-    
+        return ($output);
+
     }
 
+    public function setChamber(string $chamber)
+    {
 
-    public function setChamber(string $chamber) {
-        
-        $this->chamber=$chamber;
+        $this->chamber = $chamber;
         return;
     }
 
+    public function setSpeakers(array $speakers)
+    {
 
-    public function setSpeakers(array $speakers) {
-        
         # do things
-        
+
         return;
     }
 
-    public function write($filename) {
+    public function write($filename)
+    {
 
         // Get boilerplate for publilcwhip xml, spit it out to a file
 
-        $xmloutput =  file_get_contents('includes/publicwhipxmlprelude.txt');
-        $xmloutput .= "\n" . '<publicwhip scrapeversion="' . $this->revision  . '" latest="yes">' . "\n";
-        $xmloutput .= implode("\n",$this->output);
+        $xmloutput = file_get_contents('includes/publicwhipxmlprelude.txt');
+        $xmloutput .= "\n" . '<publicwhip scrapeversion="' . $this->revision . '" latest="yes">' . "\n";
+        $xmloutput .= implode("\n", $this->output);
         $xmloutput .= "\n</publicwhip>";
-        file_put_contents($filename,$xmloutput);
-        
+        file_put_contents($filename, $xmloutput);
+
         return;
     }
 
