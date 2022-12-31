@@ -10,8 +10,3 @@ A *great deal* more is to follow.
 
 Because it needs doing and nobody else has done so (possibly no one other person *can*, I dunno).
 
-Have you *tried* to find out what is going on at the European Parliament?  The transcripts don't get translated for **three to four months**. 
-So if you don't speak 23 languages you're basically SOL. Additionally, none of the written questions and answers, nor anything about votes which occur,
-are held anywhere near the transcripts which they ought to be part of.
-
-That is **by design**. It needs to stop.
