@@ -7,7 +7,7 @@
  * WARNING: HIGHLY-EXPERIMENTAL ALPHA-AS-FUCK TEST CODE
  * WARNING: NOT FOR USE
  *
- * @version  0.0.1
+ * @version  0.0.2
  * @license  https://opensource.org/licenses/GPL-2.0 GPL 2
  * @author   John Handelaar <john@handelaar.org>
  */
@@ -37,7 +37,7 @@ $akomantoso->setSpeakers($speakers);
 
 # do the thing
 $akomantoso->toPublicWhip();
-$akomantoso->write('data/EUP20221124a.xml');
+$akomantoso->write('data/europarl2022-11-24a.xml');
 
 
 
@@ -190,6 +190,7 @@ class ConvertEuroparlToPublicwhip
             '</EMPHAS>',
             '<PARA>',
             '</PARA>',
+            '<PARA/>',
             '\n',
             '\r',
         );
@@ -205,8 +206,9 @@ class ConvertEuroparlToPublicwhip
             "</em>",
             "<p lang='" . $this->currentlang . "'>",
             "</p>",
-            "",
-            "",
+            '',
+            '',
+            '',
         );
 
         $string = str_replace($in, $out, $string);
@@ -264,25 +266,32 @@ class ConvertEuroparlToPublicwhip
         foreach ($object->children() as $child) {
 
             switch ($child->getName()) {
-                case "ORATEUR":
 
+                case "ORATEUR":
                     $speakerid = $child->attributes()->CODICT;
                     $speakername = str_replace(" | ", " ", $child->attributes()->LIB);
                     $this->currentlang = strtolower($child->attributes()->LG);
                     break;
+
                 case "PARA":
                     $speechcontent .= $this->cleanup(strval(trim($child->asXML())));
                     break;
+
                 default:
+                    // If we get here this function is missing a case
                     die("function speech() doesn't know anything about " . $child->getName() . "\n");
             }
 
         }
 
         $speech = '        <speech lang="' . $this->currentlang .
-        '" id="' . $this->namespace . '/' . $this->chamber . '/' . $this->date->format('Y-m-d') . $this->revision . '.' .
-        $this->counter . '" '  . 'speakername="' . trim($speakername) . '" ';
-        
+                    '" id="' . $this->namespace . '/' . $this->chamber . '/' . $this->date->format('Y-m-d') . $this->revision . '.' .
+                    $this->counter . '" '  . 'speakername="' . trim($speakername) . '" ';
+
+
+        // Mark speakers as 'unknown' if they are not in the current MEPid-to-memberID lookup table
+        // This prevents eg Commissioners from being marked as if they were MEPs when speaking
+
         if(isset($this->speakers["$speakerid"])) {
             $speech .=  'speakerid="eu.europarl/member/' . $this->speakers["$speakerid"] . '" ';
         } else {
@@ -299,9 +308,8 @@ class ConvertEuroparlToPublicwhip
         $speech .= $speechcontent;
 
         $speech .= "</speech>";
-        #echo $speech;
-        return $speech;
 
+        return $speech;
     }
 
     private function heading($type, $object)
@@ -311,11 +319,11 @@ class ConvertEuroparlToPublicwhip
         $time = date_format($this->date, 'H:i:s');
 
         $output = "    <$type-heading " .
-        'id="' . $this->namespace . '/' . $this->chamber . '/' . $date . $this->revision . '.' . $this->counter . '" ' .
-        'nospeaker="true" lang="en" ' .
-        'time="' . $time . '" ' .
-        'url="' . '">' .
-        $this->cleanup(trim($object)) .
+            'id="' . $this->namespace . '/' . $this->chamber . '/' . $date . $this->revision . '.' . $this->counter . '" ' .
+            'nospeaker="true" lang="en" ' .
+            'time="' . $time . '" ' .
+            'url="' . '">' .
+            $this->cleanup(trim($object)) .
             "</$type-heading>";
         #echo $output ."\n";
         return ($output);
@@ -324,14 +332,12 @@ class ConvertEuroparlToPublicwhip
 
     public function setChamber(string $chamber)
     {
-
         $this->chamber = $chamber;
         return;
     }
 
     public function setSpeakers(array $speakers)
     {
-
         $this->speakers = $speakers;
         return;
     }
