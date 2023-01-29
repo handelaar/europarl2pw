@@ -12,13 +12,34 @@
  * @author   John Handelaar <john@handelaar.org>
  */
 
+
 // Test script; to be removed before release
+
+
+//  Load source data first
 $akomantoso = new ConvertEuroparlToPublicwhip('data/CRE-9-2022-11-24_EN.xml');
 $akomantoso->setChamber('europarl');
-$akomantoso->setSpeakers(array('eID' => 'publicwhip_id'));
+
+
+//  Populate person_id to member_id lookup table with mysql
+include_once('dbconnect.php');
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+$mysqli = new mysqli($dbhost, $dbuser, $dbpass, $dbname);
+$speakers = array();
+$query = "SELECT DISTINCT(person_id),member_id FROM member where left_house > '2022-11-24' and entered_house < '2022-11-24' ";
+$people = $mysqli->query($query);
+
+foreach ($people as $person) {
+    $speakers[$person["person_id"]] = $person["member_id"];
+}
+$akomantoso->setSpeakers($speakers);
+
+
+# do the thing
 $akomantoso->toPublicWhip();
 $akomantoso->write('data/EUP20221124a.xml');
-die();
+
+
 
 class ConvertEuroparlToPublicwhip
 {
@@ -260,8 +281,14 @@ class ConvertEuroparlToPublicwhip
 
         $speech = '        <speech lang="' . $this->currentlang .
         '" id="' . $this->namespace . '/' . $this->chamber . '/' . $this->date->format('Y-m-d') . $this->revision . '.' .
-        $this->counter . '" ' . 'speakerid="eu.europarl/person/' . $speakerid . '" ' .
-        'speakername="' . trim($speakername) . '" ';
+        $this->counter . '" '  . 'speakername="' . trim($speakername) . '" ';
+        
+        if(isset($this->speakers["$speakerid"])) {
+            $speech .=  'speakerid="eu.europarl/member/' . $this->speakers["$speakerid"] . '" ';
+        } else {
+            $speech .=  'speakerid="unknown" ';
+        }
+        
 
         # Don't add timestamp if we haven't yet encountered an object with a timestamp
         if ($this->date->format('H:i:s') !== "00:00:00") {
@@ -305,8 +332,7 @@ class ConvertEuroparlToPublicwhip
     public function setSpeakers(array $speakers)
     {
 
-        # do things
-
+        $this->speakers = $speakers;
         return;
     }
 
