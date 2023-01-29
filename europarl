@@ -59,7 +59,7 @@ class ConvertEuroparlToPublicwhip
         $this->date = DateTime::createFromFormat('Ymd H:i:s', preg_replace("/[^0-9]/", "", str_replace("CRE-9-", "", $filename)) . " 09:00:00");
 
         # TODO: move these to config
-        $this->namespace = 'com.kildarestreet.eu'; # use eg 'uk.org.publicwhip' if you're not in Ireland
+        $this->namespace = 'eu.openparl'; # use eg 'uk.org.publicwhip' if you're not in Ireland
         $this->revision = 'a';
 
         # Start item counter
