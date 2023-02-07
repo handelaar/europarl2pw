@@ -174,10 +174,12 @@ class ConvertEuroparlToPublicwhip
 
     private function cleanup($string)
     {
-
         /*
-
-         */
+            Replaces an array of non-HTML tags with their conventional
+            equivalents, or removes them if they are unnecessary, then
+            performs some other tidying of source items we don't want in
+            our output.
+        */
 
         $in = array(
             "<PRES>",
@@ -345,7 +347,7 @@ class ConvertEuroparlToPublicwhip
     public function write($filename)
     {
 
-        // Get boilerplate for publilcwhip xml, spit it out to a file
+        // Get boilerplate for publicwhip xml, append collected data, spit it all out to a file
 
         $xmloutput = file_get_contents('includes/publicwhipxmlprelude.txt');
         $xmloutput .= "\n" . '<publicwhip scrapeversion="' . $this->revision . '" latest="yes">' . "\n";

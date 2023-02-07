@@ -3,4 +3,5 @@
 $dbhost = "";
 $dbuser = "";
 $dbpass = "";
+$dbname = "";
 
