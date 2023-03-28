@@ -15,29 +15,30 @@
 
 // Test script; to be removed before release
 
-
-//  Load source data first
-$akomantoso = new ConvertEuroparlToPublicwhip('data/CRE-9-2022-11-24_EN.xml');
-$akomantoso->setChamber('europarl');
-
-
-//  Populate person_id to member_id lookup table with mysql
-include_once('dbconnect.php');
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-$mysqli = new mysqli($dbhost, $dbuser, $dbpass, $dbname);
-$speakers = array();
-$query = "SELECT DISTINCT(person_id),member_id FROM member where left_house > '2022-11-24' and entered_house < '2022-11-24' ";
-$people = $mysqli->query($query);
-
-foreach ($people as $person) {
-    $speakers[$person["person_id"]] = $person["member_id"];
-}
-$akomantoso->setSpeakers($speakers);
+        //  Load source data first
+        $akomantoso = new ConvertEuroparlToPublicwhip('data/CRE-9-2022-11-24_EN.xml');
+        $akomantoso->setChamber('europarl');
 
 
-# do the thing
-$akomantoso->toPublicWhip();
-$akomantoso->write('data/europarl2022-11-24a.xml');
+        //  Populate person_id to member_id lookup table with mysql
+        include_once('dbconnect.php');
+        mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+        $mysqli = new mysqli($dbhost, $dbuser, $dbpass, $dbname);
+        $speakers = array();
+        $query = "SELECT DISTINCT(person_id),member_id FROM member where left_house > '2022-11-24' and entered_house < '2022-11-24' ";
+        $people = $mysqli->query($query);
+
+        foreach ($people as $person) {
+            $speakers[$person["person_id"]] = $person["member_id"];
+        }
+        $akomantoso->setSpeakers($speakers);
+
+
+        # do the thing
+        $akomantoso->toPublicWhip();
+        $akomantoso->write('data/europarl2022-11-24a.xml');
+
+        end();
 
 
 
@@ -57,6 +58,7 @@ class ConvertEuroparlToPublicwhip
         # Filename assumed to contain date in format YYYYmmdd; this regex just removes non-numeric chars from filename
         # TODO: move this to config
         $this->date = DateTime::createFromFormat('Ymd H:i:s', preg_replace("/[^0-9]/", "", str_replace("CRE-9-", "", $filename)) . " 09:00:00");
+        $this->dateend = DateTime::createFromFormat('Ymd H:i:s', preg_replace("/[^0-9]/", "", str_replace("CRE-9-", "", $filename)) . " 09:00:00");
 
         # TODO: move these to config
         $this->namespace = 'eu.openparl'; # use eg 'uk.org.publicwhip' if you're not in Ireland
@@ -116,6 +118,9 @@ class ConvertEuroparlToPublicwhip
                         if (isset($child->attributes()->{'VOD-START'})) {
                             $this->date = DateTime::createFromFormat('Y-m-d\TH:i:s.v', (string) $child->attributes()->{'VOD-START'}, new DateTimeZone('Europe/Brussels'));
                         }
+                        if (isset($child->attributes()->{'VOD-END'})) {
+                            $this->dateend = DateTime::createFromFormat('Y-m-d\TH:i:s.v', (string) $child->attributes()->{'VOD-END'}, new DateTimeZone('Europe/Brussels'));
+                        }
                         break;
 
                     case "NUMERO":
@@ -163,6 +168,12 @@ class ConvertEuroparlToPublicwhip
         if (isset($object->attributes()->{'VOD-START'})) {
 
             $this->date = DateTime::createFromFormat('Y-m-d\TH:i:s.v', (string) $object->attributes()->{'VOD-START'}, new DateTimeZone('Europe/Brussels'));
+
+        }
+
+        if (isset($object->attributes()->{'VOD-END'})) {
+
+            $this->dateend = DateTime::createFromFormat('Y-m-d\TH:i:s.v', (string) $object->attributes()->{'VOD-END'}, new DateTimeZone('Europe/Brussels'));
 
         }
 
@@ -239,8 +250,11 @@ class ConvertEuroparlToPublicwhip
         $this->counter . '" ' . 'nospeaker="true" ';
 
         # Don't add timestamp if we haven't yet encountered an object with a timestamp
-        if ($this->date->format('H:i:s') !== "00:00:00") {
+        if ($this->date->format('H:i:s') !== "09:00:00") {
             $speech .= 'time="' . $this->date->format('H:i:s') . '" ';
+        }
+        if ($this->dateend->format('H:i:s') !== "09:00:00") {
+            $speech .= 'end="' . $this->dateend->format('H:i:s') . '" ';
         }
 
         $speech .= 'url="' . '">' . $this->cleanup(trim($string)) . "</speech>";
@@ -302,8 +316,11 @@ class ConvertEuroparlToPublicwhip
         
 
         # Don't add timestamp if we haven't yet encountered an object with a timestamp
-        if ($this->date->format('H:i:s') !== "00:00:00") {
+        if ($this->date->format('H:i:s') !== "09:00:00") {
             $speech .= 'time="' . $this->date->format('H:i:s') . '" ';
+        }
+        if ($this->dateend->format('H:i:s') !== "09:00:00") {
+            $speech .= 'end="' . $this->dateend->format('H:i:s') . '" ';
         }
         $speech .= 'url="' . '">';
 
@@ -319,11 +336,13 @@ class ConvertEuroparlToPublicwhip
 
         $date = date_format($this->date, 'Y-m-d');
         $time = date_format($this->date, 'H:i:s');
+        $end  = date_format($this->dateend, 'H:i:s');
 
         $output = "    <$type-heading " .
             'id="' . $this->namespace . '/' . $this->chamber . '/' . $date . $this->revision . '.' . $this->counter . '" ' .
             'nospeaker="true" lang="en" ' .
             'time="' . $time . '" ' .
+            'end="' . $end . '" ' .
             'url="' . '">' .
             $this->cleanup(trim($object)) .
             "</$type-heading>";
@@ -340,6 +359,18 @@ class ConvertEuroparlToPublicwhip
 
     public function setSpeakers(array $speakers)
     {
+
+        /*
+
+        Send this function a two-dimensional array whose structure is
+
+        $key => $value
+
+        where $key is an ID found in the source document and $value is the TWFY member_id 
+        which relates to that ID on the day that this document was recorded
+
+        */
+
         $this->speakers = $speakers;
         return;
     }
