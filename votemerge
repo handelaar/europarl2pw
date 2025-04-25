@@ -1,0 +1,154 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * votemerge - Insert missing vote details into European Parliament plenary XML
+ *
+ * @version  0.0.1
+ * @license  https://opensource.org/licenses/GPL-2.0 GPL 2
+ * @author   John Handelaar <john@handelaar.org>
+ */
+
+
+// Test script; to be removed before release
+
+$today = new VoteMerge();
+
+$votes = $today->ExtractVotes('data/PV-9-2022-11-24-RCV_FR.xml');
+$votesections = $today->GetVoteSections('data/CRE-9-2022-11-24_EN.xml',$votes);
+
+echo $today->Merge('data/CRE-9-2022-11-24_EN.xml',$votesections,'out.xml');
+
+# do the thing
+#$akomantoso->toPublicWhip();
+#$akomantoso->write('data/europarl2022-11-24a.xml');
+
+die();
+
+class VoteMerge
+{
+    public function Merge($transcriptfile,$processedvotes,$outfile) {
+        $output = "";
+        #echo($processedvotes);die();
+        $this->newsections = simplexml_load_string($processedvotes);
+        $infile = file_get_contents($transcriptfile);
+        file_put_contents($outfile, $infile);
+
+        foreach ($this->newsections as $insert) {
+            $infile = file_get_contents($outfile);
+            $splitstring = '<CHAPTER NUMBER="' . $insert->attributes()->NUMBER . '">';
+            $beforeparts = explode($splitstring,$infile);
+            $afterparts = explode("</CHAPTER>",$beforeparts[1]);
+            unset($afterparts[0]);
+            $beforeparts[1] = implode("</CHAPTER>",$afterparts);
+            $output = implode($insert->asxml(), $beforeparts);
+            #echo $output;
+            file_put_contents($outfile,$output);
+            unset($infile,$splitstring,$beforeparts,$afterparts,$output);
+
+        }
+    }
+
+    public function ExtractVotes($filename)
+    {
+        $this->votes = simplexml_load_file($filename);
+        $this->voteoutput = array();
+
+        foreach ($this->votes->xpath('RollCallVote.Result') as $vote) {
+            #echo "found a vote: id=" . $vote->attributes()->Identifier . "\n";
+            #echo $vote->asXML() . "\n\n";
+            #echo $vote->attributes()->Date; 
+            $timestamp = DateTime::createFromFormat('Y-m-d H:i:s', (string) $vote->attributes()->Date, new DateTimeZone('Europe/Brussels'));
+            $key=intval($timestamp->format('U'));
+
+            if ($vote->asXML === false) {
+                echo "Failed loading XML\n";
+                foreach(libxml_get_errors() as $error) {
+                    echo "\t", $error->message;
+                }
+            }
+            
+            $this->voteoutput[$key] = $vote->asXML();
+            
+        }
+        return($this->voteoutput);
+        
+    }
+    
+
+    public function GetVoteSections($filename, $votes)
+    {
+
+        $this->europarl = simplexml_load_file($filename);
+
+        $this->output = array();
+        $votesection = 0;
+
+        foreach ($this->europarl->xpath('//HTML/DEBATS/CHAPTER') as $section) {
+            $local = new SimpleXmlElement($section->asXml());
+            $englishchapter = $local->xpath('//TL-CHAP[@VL="EN"]');
+            $englishtitlenode = dom_import_simplexml($englishchapter[0]);
+            $englishtitle = $englishtitlenode->nodeValue;
+
+            if(stristr(strtolower($englishtitle),"voting time")) {
+                $votesection = $section->attributes()->NUMBER;
+                #echo "LOOPSTART $votesection\n";
+                #echo sizeof($votes) . " votes left\n";
+            }
+
+            if(stristr($section->attributes()->NUMBER, ".")) {
+                $sectionnumberparts = explode(".",$section->attributes()->NUMBER);
+                
+                if (intval($sectionnumberparts[0]) === (intval($votesection))) {
+                    $this->output[] .= "\n" . '<CHAPTER NUMBER="' . strval($section->attributes()->NUMBER) . '">' . "\n";
+                    foreach($section as $child) {
+                        $tag = $child->getName();
+                        #echo "$tag  ";
+                        #echo strval($section->attributes()->NUMBER) . "    \n"; 
+                        if (isset($child->attributes()->{'VOD-START'})) {
+                            $start = DateTime::createFromFormat('Y-m-d\TH:i:s.v', (string) $child->attributes()->{'VOD-START'}, new DateTimeZone('Europe/Brussels'));
+                            $startu = intval($start->format('U'));
+                        }
+                        
+                        if (isset($child->attributes()->{'VOD-END'})) {
+                            $end = DateTime::createFromFormat('Y-m-d\TH:i:s.v', (string) $child->attributes()->{'VOD-END'}, new DateTimeZone('Europe/Brussels'));
+                            $endu = intval($end->format('U'));
+                            
+                        }
+                        if($tag = "TL-CHAP") {
+                            $this->output[] .= $child->asXML() . "\n";
+                        } else {
+                            foreach ($votes as $key => $content) {
+                                if ((intval($key) > $startu) && intval($key) < $endu) {
+                                    #echo "$key $startu $endu\n";
+                                    #echo "vote!  \n";
+                                    $this->output[] .= $content . "\n    ";
+                                    unset($votes[$key]);
+                                    #echo sizeof($votes) . " votes left\n";
+                                }
+                            }
+                            $this->output[] .= $child->asXML();
+                        }
+                    }
+
+                    foreach ($votes as $key => $content) {
+                        if ((intval($key) > $startu) && intval($key) < $endu) {
+                            #echo "$key $startu $endu\n";
+                            #echo "vote!  \n";
+                            $this->output[] .= $content . "\n    ";
+                            unset($votes[$key]);
+                            #echo sizeof($votes) . " votes left\n";
+                        }
+                    }
+                        
+                    $this->output[] .= "</CHAPTER>";
+                }
+                
+            }
+        }
+        $returnval = implode($this->output);
+        $returnval = "<?xml version='1.0'?>\n<votesections>" . $returnval . "\n</votesections>";
+        return(trim($returnval));
+    }
+}
+
